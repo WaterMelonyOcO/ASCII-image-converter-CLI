@@ -1,7 +1,6 @@
-import { exit, stdout } from "process";
+import { stdout } from "process";
 import fs from "fs";
 import sharp from "sharp";
-import ques from "readline-sync";
 class ASCII_Generator {
     constructor(filePath, args) {
         this.ASCII_CHARS = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,\"^`'. ".split("");
@@ -11,6 +10,7 @@ class ASCII_Generator {
         this.toConsole = true;
         this.withColor = false;
         this.onAdaptive = false;
+        console.log(this.interval);
         if (args) {
             this.chechParams(args);
         }
@@ -19,8 +19,9 @@ class ASCII_Generator {
         let newImg;
         this.getSize(sourceImg)
             .then(s => {
-            newImg = this.resizeImage(sourceImg, s);
-            this.withColor ? newImg = this.convertColorImage(newImg) : newImg = this.convertGreyImage(newImg);
+            // newImg = this.resizeImage(sourceImg, s)
+            this.withColor ? newImg = this.convertColorImage(sourceImg) : newImg = this.convertGreyImage(sourceImg);
+            newImg = this.resizeImage(newImg, s);
             this.toFile ? this.printToFile(newImg, s[0]) : this.printToConsole(newImg, s[0]);
         });
     }
@@ -38,7 +39,12 @@ class ASCII_Generator {
         }
         else {
             let meta = await img.metadata();
-            return [meta.width || 100, meta.height || 100];
+            let width = meta.width || 100;
+            let height = meta.height || 100;
+            if (width > 1500 || height > 1500) {
+                return [1500, 1500];
+            }
+            return [width, height];
         }
     }
     convertGreyImage(img) {
@@ -62,9 +68,21 @@ class ASCII_Generator {
     async createArt(img, width) {
         let imagePixels = await img.raw().toBuffer();
         let characters = "";
+        let charCount = [];
         imagePixels.forEach((pixel) => {
-            characters = characters + this.ASCII_CHARS[Math.floor(pixel * this.interval)];
+            let char = this.ASCII_CHARS[Math.floor(pixel * this.interval)];
+            let a = charCount.find((i) => i.char === char);
+            if (a !== undefined)
+                a.count++;
+            else
+                charCount.push({ char, count: 1 });
+            characters = characters + char;
         });
+        let maxSymbol = charCount.filter((i) => Math.max(i.count))[0].char;
+        characters = characters.split("").map((c) => { if (c === maxSymbol)
+            return " ";
+        else
+            return c; }).join("");
         let ASCII = "";
         for (let i = 0; i < characters.length; i += width) {
             let line = characters.split("").slice(i, i + width);
@@ -92,13 +110,13 @@ class ASCII_Generator {
 }
 main();
 function main() {
-    let [filePath, ...param] = ques.promptCL();
-    if (fs.existsSync(filePath)) {
-        new ASCII_Generator(filePath, param);
-    }
-    else {
-        console.log('file on apth not exist');
-        exit(0);
-    }
+    // let [filePath, ...param] = ques.promptCL()
+    // if (fs.existsSync(filePath)) {
+    new ASCII_Generator("cap.jpg", ['-a', '-f']);
+    // }
+    // else {
+    //     console.log('file on apth not exist');
+    //     exit(0)
+    // }
 }
 //# sourceMappingURL=main.js.map

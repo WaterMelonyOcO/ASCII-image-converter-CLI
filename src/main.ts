@@ -4,6 +4,7 @@ import sharp from "sharp";
 import ques from "readline-sync";
 
 type size = [number, number]
+type charCounter = { char: string, count: number }[]
 
 class ASCII_Generator {
 
@@ -20,21 +21,22 @@ class ASCII_Generator {
     onAdaptive = false
 
     constructor(filePath: string, args?: string[]) {
+        console.log(this.interval);
 
         if (args) {
             this.chechParams(args)
         }
-
         this.filePath = filePath
         const sourceImg = sharp(this.filePath);
         let newImg
-        
+
         this.getSize(sourceImg)
-        .then(s=>{
-            newImg = this.resizeImage(sourceImg, s)
-            this.withColor ? newImg = this.convertColorImage(newImg) : newImg = this.convertGreyImage(newImg);
-            this.toFile ? this.printToFile(newImg, s[0]) : this.printToConsole(newImg, s[0])
-        })
+            .then(s => {
+                // newImg = this.resizeImage(sourceImg, s)
+                this.withColor ? newImg = this.convertColorImage(sourceImg) : newImg = this.convertGreyImage(sourceImg);
+                newImg = this.resizeImage(newImg, s)
+                this.toFile ? this.printToFile(newImg, s[0]) : this.printToConsole(newImg, s[0])
+            })
     }
 
     resizeImage(img: sharp.Sharp, size: size): sharp.Sharp {
@@ -46,16 +48,22 @@ class ASCII_Generator {
         })
     }
 
-    async getSize(img: sharp.Sharp): Promise<size>{
+    async getSize(img: sharp.Sharp): Promise<size> {
         const ratio: number = (stdout.columns / stdout.rows) / 2
         const size: size = [Math.floor(stdout.rows * ratio), Math.floor(stdout.rows * ratio)]
 
-        if ( this.onAdaptive ){
+        if (this.onAdaptive) {
             return size;
         }
-        else{
+        else {
             let meta = await img.metadata()
-            return [meta.width || 100, meta.height || 100]
+            let width = meta.width || 100
+            let height = meta.height || 100
+
+            if (width > 1500 || height > 1500) {
+                return [1500, 1500];
+            }
+            return [width, height]
         }
 
     }
@@ -64,6 +72,7 @@ class ASCII_Generator {
         return img.greyscale()
     }
 
+    //in work
     convertColorImage(img: sharp.Sharp): sharp.Sharp {
         throw new Error("Function not implemented.");
     }
@@ -84,20 +93,30 @@ class ASCII_Generator {
             })
     }
 
+    //in work(try add clear background)
     async createArt(img: sharp.Sharp, width: number): Promise<string> {
         let imagePixels: Buffer = await img.raw().toBuffer();
         let characters = "";
+        let charCount: charCounter = []
 
         imagePixels.forEach((pixel: any) => {
-            characters = characters + this.ASCII_CHARS[Math.floor(pixel * this.interval)];
+            let char: string = this.ASCII_CHARS[Math.floor(pixel * this.interval)];
+            
+            let a = charCount.find((i)=>i.char === char)
+            if (a !== undefined) a.count++; else charCount.push({char, count: 1})
+
+            characters = characters + char;
         });
+
+        let maxSymbol = charCount.filter((i)=>Math.max(i.count))[0].char
+        characters = characters.split("").map((c)=> {if(c === maxSymbol) return " "; else return c}).join("")
 
         let ASCII = ""
         for (let i = 0; i < characters.length; i += width) {
             let line = characters.split("").slice(i, i + width);
             ASCII = ASCII + "\n" + line;
         }
-
+        
         return ASCII
     }
 
@@ -121,15 +140,15 @@ class ASCII_Generator {
 }
 main()
 function main(): void {
-    let [filePath, ...param] = ques.promptCL()
+    // let [filePath, ...param] = ques.promptCL()
 
-    if (fs.existsSync(filePath)) {
-        new ASCII_Generator(filePath, param)
-    }
-    else {
-        console.log('file on apth not exist');
-        exit(0)
-    }
+    // if (fs.existsSync(filePath)) {
+        new ASCII_Generator("cap.jpg", ['-a'])
+    // }
+    // else {
+    //     console.log('file on apth not exist');
+    //     exit(0)
+    // }
 }
 
 
