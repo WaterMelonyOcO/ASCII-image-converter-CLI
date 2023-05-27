@@ -17,7 +17,7 @@ class ASCII_Generator {
     toFile = false;
     toConsole = true;
     withColor = false;
-    inFullScreen = false
+    onAdaptive = false
 
     constructor(filePath: string, args?: string[]) {
 
@@ -26,56 +26,67 @@ class ASCII_Generator {
         }
 
         this.filePath = filePath
-        let sourceImg: sharp.Sharp = sharp(this.filePath)
-
-        this.toFile ? this.printToFile(sourceImg) : this.printToConsole(sourceImg)
+        const sourceImg = sharp(this.filePath);
+        let newImg
+        
+        this.getSize(sourceImg)
+        .then(s=>{
+            newImg = this.resizeImage(sourceImg, s)
+            this.withColor ? newImg = this.convertColorImage(newImg) : newImg = this.convertGreyImage(newImg);
+            this.toFile ? this.printToFile(newImg, s[0]) : this.printToConsole(newImg, s[0])
+        })
     }
 
-    convertGreyImage(img: sharp.Sharp): sharp.Sharp {
+    resizeImage(img: sharp.Sharp, size: size): sharp.Sharp {
 
-        let newImg = img.greyscale()
-
-        return newImg
-    }
-
-    convertColorImage(img: sharp.Sharp): sharp.Sharp {
-        throw new Error("Function not implemented.");
-    }
-
-    resizeImage( img: sharp.Sharp): sharp.Sharp{
-        const ratio: number = (process.stdout.columns / process.stdout.rows) / 2
-        const size: size = [Math.floor(stdout.rows * ratio), Math.floor(stdout.rows * ratio)]
+        console.log(size);
 
         return img.resize(size[0], size[1], {
             fit: "inside",
         })
     }
 
-    printToFile(img: sharp.Sharp ): void {
+    async getSize(img: sharp.Sharp): Promise<size>{
+        const ratio: number = (stdout.columns / stdout.rows) / 2
+        const size: size = [Math.floor(stdout.rows * ratio), Math.floor(stdout.rows * ratio)]
 
-        this.inFullScreen ? null : img = this.resizeImage(img)
-        this.withColor ? img = this.convertColorImage(img) : img = this.convertGreyImage(img)
+        if ( this.onAdaptive ){
+            return size;
+        }
+        else{
+            let meta = await img.metadata()
+            return [meta.width || 100, meta.height || 100]
+        }
 
-        this.createArt(img)
-        .then(ar=>{
-            fs.writeFileSync("Art.txt", ar)
-        })
     }
 
-    printToConsole(img: sharp.Sharp): void {
-        this.inFullScreen ? null : img = this.resizeImage(img)
-        this.withColor ? img = this.convertColorImage(img) : img = this.convertGreyImage(img)
-
-        this.createArt(img)
-        .then(ar=>{
-            console.log(ar);
-        })
+    convertGreyImage(img: sharp.Sharp): sharp.Sharp {
+        return img.greyscale()
     }
 
-    async createArt(img: sharp.Sharp): Promise<string>{
+    convertColorImage(img: sharp.Sharp): sharp.Sharp {
+        throw new Error("Function not implemented.");
+    }
+
+    printToFile(img: sharp.Sharp, width: number): void {
+
+        this.createArt(img, width)
+            .then(ar => {
+                fs.writeFileSync("Art.txt", ar)
+            })
+    }
+
+    printToConsole(img: sharp.Sharp, width: number): void {
+
+        this.createArt(img, width)
+            .then(ar => {
+                console.log(ar);
+            })
+    }
+
+    async createArt(img: sharp.Sharp, width: number): Promise<string> {
         let imagePixels: Buffer = await img.raw().toBuffer();
         let characters = "";
-        let width = (await img.metadata()).width || 100
 
         imagePixels.forEach((pixel: any) => {
             characters = characters + this.ASCII_CHARS[Math.floor(pixel * this.interval)];
@@ -88,7 +99,7 @@ class ASCII_Generator {
         }
 
         return ASCII
-    } 
+    }
 
     chechParams(args: string[]): void {
         for (let i of args) {
@@ -102,8 +113,8 @@ class ASCII_Generator {
             if (i === "-t" || i === "--console") {
                 this.toConsole = true
             }
-            if (i === "-w" || i === "--windowed") {
-                this.inFullScreen = false
+            if (i === "-a" || i === "--adaptive") {
+                this.onAdaptive = true
             }
         }
     }

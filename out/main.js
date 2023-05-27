@@ -10,48 +10,58 @@ class ASCII_Generator {
         this.toFile = false;
         this.toConsole = true;
         this.withColor = false;
-        this.inFullScreen = false;
+        this.onAdaptive = false;
         if (args) {
             this.chechParams(args);
         }
         this.filePath = filePath;
-        let sourceImg = sharp(this.filePath);
-        this.toFile ? this.printToFile(sourceImg) : this.printToConsole(sourceImg);
+        const sourceImg = sharp(this.filePath);
+        let newImg;
+        this.getSize(sourceImg)
+            .then(s => {
+            newImg = this.resizeImage(sourceImg, s);
+            this.withColor ? newImg = this.convertColorImage(newImg) : newImg = this.convertGreyImage(newImg);
+            this.toFile ? this.printToFile(newImg, s[0]) : this.printToConsole(newImg, s[0]);
+        });
     }
-    convertGreyImage(img) {
-        let newImg = img.greyscale();
-        return newImg;
-    }
-    convertColorImage(img) {
-        throw new Error("Function not implemented.");
-    }
-    resizeImage(img) {
-        const ratio = (process.stdout.columns / process.stdout.rows) / 2;
-        const size = [Math.floor(stdout.rows * ratio), Math.floor(stdout.rows * ratio)];
+    resizeImage(img, size) {
+        console.log(size);
         return img.resize(size[0], size[1], {
             fit: "inside",
         });
     }
-    printToFile(img) {
-        this.inFullScreen ? null : img = this.resizeImage(img);
-        this.withColor ? img = this.convertColorImage(img) : img = this.convertGreyImage(img);
-        this.createArt(img)
+    async getSize(img) {
+        const ratio = (stdout.columns / stdout.rows) / 2;
+        const size = [Math.floor(stdout.rows * ratio), Math.floor(stdout.rows * ratio)];
+        if (this.onAdaptive) {
+            return size;
+        }
+        else {
+            let meta = await img.metadata();
+            return [meta.width || 100, meta.height || 100];
+        }
+    }
+    convertGreyImage(img) {
+        return img.greyscale();
+    }
+    convertColorImage(img) {
+        throw new Error("Function not implemented.");
+    }
+    printToFile(img, width) {
+        this.createArt(img, width)
             .then(ar => {
             fs.writeFileSync("Art.txt", ar);
         });
     }
-    printToConsole(img) {
-        this.inFullScreen ? null : img = this.resizeImage(img);
-        this.withColor ? img = this.convertColorImage(img) : img = this.convertGreyImage(img);
-        this.createArt(img)
+    printToConsole(img, width) {
+        this.createArt(img, width)
             .then(ar => {
             console.log(ar);
         });
     }
-    async createArt(img) {
+    async createArt(img, width) {
         let imagePixels = await img.raw().toBuffer();
         let characters = "";
-        let width = (await img.metadata()).width || 100;
         imagePixels.forEach((pixel) => {
             characters = characters + this.ASCII_CHARS[Math.floor(pixel * this.interval)];
         });
@@ -74,8 +84,8 @@ class ASCII_Generator {
             if (i === "-t" || i === "--console") {
                 this.toConsole = true;
             }
-            if (i === "-w" || i === "--windowed") {
-                this.inFullScreen = false;
+            if (i === "-a" || i === "--adaptive") {
+                this.onAdaptive = true;
             }
         }
     }
