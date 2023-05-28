@@ -10,6 +10,7 @@ class ASCII_Generator {
         this.toConsole = true;
         this.withColor = false;
         this.onAdaptive = false;
+        this.background = false;
         console.log(this.interval);
         if (args) {
             this.chechParams(args);
@@ -19,9 +20,8 @@ class ASCII_Generator {
         let newImg;
         this.getSize(sourceImg)
             .then(s => {
-            // newImg = this.resizeImage(sourceImg, s)
-            this.withColor ? newImg = this.convertColorImage(sourceImg) : newImg = this.convertGreyImage(sourceImg);
-            newImg = this.resizeImage(newImg, s);
+            newImg = this.resizeImage(sourceImg, s);
+            this.withColor ? newImg = this.convertColorImage(newImg) : newImg = this.convertGreyImage(newImg);
             this.toFile ? this.printToFile(newImg, s[0]) : this.printToConsole(newImg, s[0]);
         });
     }
@@ -50,6 +50,7 @@ class ASCII_Generator {
     convertGreyImage(img) {
         return img.greyscale();
     }
+    //in work
     convertColorImage(img) {
         throw new Error("Function not implemented.");
     }
@@ -65,27 +66,35 @@ class ASCII_Generator {
             console.log(ar);
         });
     }
-    async createArt(img, width) {
-        let imagePixels = await img.raw().toBuffer();
-        let characters = "";
+    clearOftenSym(img) {
         let charCount = [];
-        imagePixels.forEach((pixel) => {
-            let char = this.ASCII_CHARS[Math.floor(pixel * this.interval)];
-            let a = charCount.find((i) => i.char === char);
-            if (a !== undefined)
-                a.count++;
+        img.split("").forEach((char) => {
+            let charCheck = charCount.find((i) => i.char === char);
+            if (charCheck !== undefined)
+                charCheck.count++;
             else
                 charCount.push({ char, count: 1 });
-            characters = characters + char;
         });
         let maxSymbol = charCount.filter((i) => Math.max(i.count))[0].char;
-        characters = characters.split("").map((c) => { if (c === maxSymbol)
+        img = img.split("").map((c) => { if (c === maxSymbol)
             return " ";
         else
             return c; }).join("");
+        return img;
+    }
+    //in work(try add clear background)
+    async createArt(img, width) {
+        let imagePixels = await img.raw().toBuffer();
+        let characters = "";
+        imagePixels.forEach((pixel) => {
+            let char = this.ASCII_CHARS[Math.floor(pixel * this.interval)];
+            characters = characters + char;
+        });
+        this.background ? characters = this.clearOftenSym(characters) : characters;
         let ASCII = "";
-        for (let i = 0; i < characters.length; i += width) {
-            let line = characters.split("").slice(i, i + width);
+        for (let i = (width * 15); i < characters.length; i += width) {
+            let line = characters.substring(i, i + width);
+            // let line = characters.split("").slice(i, i + width).toString();
             ASCII = ASCII + "\n" + line;
         }
         return ASCII;
@@ -105,6 +114,9 @@ class ASCII_Generator {
             if (i === "-a" || i === "--adaptive") {
                 this.onAdaptive = true;
             }
+            if (i === "-b" || i === "--offbackground") {
+                this.background = true;
+            }
         }
     }
 }
@@ -112,7 +124,7 @@ main();
 function main() {
     // let [filePath, ...param] = ques.promptCL()
     // if (fs.existsSync(filePath)) {
-    new ASCII_Generator("cap.jpg", ['-a', '-f']);
+    new ASCII_Generator("duck.jpg", ['-a', '-b']);
     // }
     // else {
     //     console.log('file on apth not exist');

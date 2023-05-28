@@ -18,7 +18,8 @@ class ASCII_Generator {
     toFile = false;
     toConsole = true;
     withColor = false;
-    onAdaptive = false
+    onAdaptive = false;
+    background = false;
 
     constructor(filePath: string, args?: string[]) {
         console.log(this.interval);
@@ -32,9 +33,8 @@ class ASCII_Generator {
 
         this.getSize(sourceImg)
             .then(s => {
-                // newImg = this.resizeImage(sourceImg, s)
-                this.withColor ? newImg = this.convertColorImage(sourceImg) : newImg = this.convertGreyImage(sourceImg);
-                newImg = this.resizeImage(newImg, s)
+                newImg = this.resizeImage(sourceImg, s)
+                this.withColor ? newImg = this.convertColorImage(newImg) : newImg = this.convertGreyImage(newImg);
                 this.toFile ? this.printToFile(newImg, s[0]) : this.printToConsole(newImg, s[0])
             })
     }
@@ -49,7 +49,7 @@ class ASCII_Generator {
     }
 
     async getSize(img: sharp.Sharp): Promise<size> {
-        const ratio: number = (stdout.columns / stdout.rows) / 2
+        const ratio: number = (stdout.columns  / stdout.rows) / 2
         const size: size = [Math.floor(stdout.rows * ratio), Math.floor(stdout.rows * ratio)]
 
         if (this.onAdaptive) {
@@ -93,30 +93,42 @@ class ASCII_Generator {
             })
     }
 
+    clearOftenSym(img: string) {
+
+        let charCount: charCounter = []
+
+        img.split("").forEach((char) => {
+
+            let charCheck = charCount.find((i) => i.char === char)
+            if (charCheck !== undefined) charCheck.count++; else charCount.push({ char, count: 1 })
+
+        })
+
+        let maxSymbol = charCount.filter((i) => Math.max(i.count))[0].char
+        img = img.split("").map((c) => { if (c === maxSymbol) return " "; else return c }).join("")
+        return img
+    }
+
     //in work(try add clear background)
     async createArt(img: sharp.Sharp, width: number): Promise<string> {
         let imagePixels: Buffer = await img.raw().toBuffer();
         let characters = "";
-        let charCount: charCounter = []
 
         imagePixels.forEach((pixel: any) => {
-            let char: string = this.ASCII_CHARS[Math.floor(pixel * this.interval)];
-            
-            let a = charCount.find((i)=>i.char === char)
-            if (a !== undefined) a.count++; else charCount.push({char, count: 1})
-
+            let char = this.ASCII_CHARS[Math.floor(pixel * this.interval)];
             characters = characters + char;
         });
 
-        let maxSymbol = charCount.filter((i)=>Math.max(i.count))[0].char
-        characters = characters.split("").map((c)=> {if(c === maxSymbol) return " "; else return c}).join("")
+        this.background ? characters = this.clearOftenSym(characters) : characters
 
         let ASCII = ""
-        for (let i = 0; i < characters.length; i += width) {
-            let line = characters.split("").slice(i, i + width);
+        for (let i = width ; i < characters.length; i += width) {
+            let line = characters.substring(i, i + width);
+
+            // let line = characters.split("").slice(i, i + width).toString();
             ASCII = ASCII + "\n" + line;
         }
-        
+
         return ASCII
     }
 
@@ -135,6 +147,9 @@ class ASCII_Generator {
             if (i === "-a" || i === "--adaptive") {
                 this.onAdaptive = true
             }
+            if (i === "-b" || i === "--offbackground") {
+                this.background = true
+            }
         }
     }
 }
@@ -143,7 +158,7 @@ function main(): void {
     // let [filePath, ...param] = ques.promptCL()
 
     // if (fs.existsSync(filePath)) {
-        new ASCII_Generator("cap.jpg", ['-a'])
+    new ASCII_Generator("duck.jpg", ['-a','-b'])
     // }
     // else {
     //     console.log('file on apth not exist');
