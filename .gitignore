@@ -1,3 +1,7 @@
 node_modules
 out/*
-*.[jpg,png]
+*.jpg
+*.png
+Art.txt
+.vscode
+test*
