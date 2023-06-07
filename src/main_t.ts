@@ -42,7 +42,7 @@ class ASCII_Generator {
             .then(s => {
                 newImg = this.resizeImage(sourceImg, s)
                 this.bar.increment(20)
-                newImg = this.convertGreyImage(newImg);
+                this.withColor ? newImg : newImg = this.convertGreyImage(newImg);
                 this.toFile ? this.printToFile(newImg, s[0]) : this.printToConsole(newImg, s[0])
                 this.bar.increment(20)
             })
@@ -88,22 +88,17 @@ class ASCII_Generator {
     }
 
     //in work
-    ColorOut(img: string[], imageColorBuf: Buffer): string[] {
+    convertColorImage(img: string[], imageColorBuf: Buffer): string[] {
         this.bar.increment(10)
         
         const colorfulText: string[] = []
         for ( let i = 0; i < img.length; i++){
-            if( img[i] === " "){
-                colorfulText.push(" ")
-            }
-            else{
-                let rgb = {r:imageColorBuf[i], g:imageColorBuf[i+1], b:imageColorBuf[i+2]}
-                let char = `\x1b[38;2;${rgb.r - 1};${rgb.g - 1};${rgb.b - 1}m${img[i]}`;
-                // let char = `\x1b[38;5;${imageColorBuf[i]}m${img[i]}`;
-                colorfulText.push(char)
-            }
-
+            // let rgb = {r:imageColorBuf[i], g:imageColorBuf[i+1], b:imageColorBuf[i+2]}
+            // let char = `\\033[38;5;${rgb.r};${rgb.g};${rgb.b}m${img[i]}`;
+            let char = `\\033[38;2;${imageColorBuf[i]}m${img[i]}`;
+            colorfulText.push(char)
         }
+
         return colorfulText;
     }
 
@@ -127,13 +122,11 @@ class ASCII_Generator {
             })
     }
 
-    clearOftenSym(imgArr: string[], width: number) {
+    clearOftenSym(img: string, width: number) {
 
         let charCount: charCounter = []
         let tempImg: string = '';
 
-        let img = imgArr.join('')
-        
         this.bar.increment(10)
         img.split("").forEach((char) => {
 
@@ -152,27 +145,28 @@ class ASCII_Generator {
             }
         }
         img = tempImg
-        return img.split('')
+        return img
     }
 
     async createArt(img: sharp.Sharp, width: number): Promise<string> {
         let imagePixels: Buffer = await img.raw().toBuffer();
-        let characters: string[] = [];
+        let characters = "";
 
         
         imagePixels.forEach((pixel: any) => {
             let char = this.ASCII_CHARS[Math.floor(pixel * this.interval)];
-            characters.push( char );
+            characters = characters + char ;
         });
 
         this.background ? characters = this.clearOftenSym(characters, width) : characters
-        this.withColor ? characters = this.ColorOut(characters, imagePixels) : characters
+        // this.withColor ? characters = this.convertColorImage(characters, imagePixels) : characters
 
    
-        let ASCII = '';
+        let ASCII = ""
         for (let i = width ; i < characters.length; i += width) {
             
-            let line = characters.slice(i, i + width).join('').replace('.','');
+            let line = characters.substring(i, i+width);
+            // let line = characters.slice(i, i + width).toString().replace(',',"");
 
             // let line = characters.split("").slice(i, i + width).toString();
             ASCII = ASCII + "\n" + line;
@@ -189,7 +183,7 @@ class ASCII_Generator {
                 this.toFile = true;
                 this.toConsole = false
             }
-            if (i === "-t" || i === "--terminal") {
+            if (i === "-t" || i === "--console") {
                 this.toConsole = true
             }
             if (i === "-a" || i === "--adaptive") {
@@ -206,7 +200,7 @@ function main(): void {
     // let [filePath, ...param] = ques.promptCL()
 
     // if (fs.existsSync(filePath)) {
-    new ASCII_Generator("duck.jpg", ['-a','-b', '-c'])
+    new ASCII_Generator("duck.jpg", ['-a','-b'])
     // }
     // else {
     //     console.log('file on apth not exist');
