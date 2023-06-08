@@ -178,9 +178,9 @@ class ASCII_Generator {
         let charactersData: charData = { pixelOffset: [], chars: [] };
 
 
-        imagePixels.forEach((pixel: number) => {
+        imagePixels.forEach((pixel: number, ind) => {
             let char: string = this.ASCII_CHARS[Math.floor(pixel * this.interval)];
-            charactersData.pixelOffset.push(pixel);
+            charactersData.pixelOffset.push(ind);
             charactersData.chars.push(char);
         });
 
@@ -225,7 +225,7 @@ function main(): void {
     // let [filePath, ...param] = ques.promptCL()
 
     // if (fs.existsSync(filePath)) {
-    new ASCII_Generator("duck.jpg", ['-a','-b', '-c'])
+    new ASCII_Generator("duck.jpg", ['-c', '-f'])
     // }
     // else {
     //     console.log('file on apth not exist');
