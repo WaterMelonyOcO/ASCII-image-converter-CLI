@@ -1,12 +1,17 @@
-import { exit, stdout } from "process";
+import { exit, off, stdout } from "process";
 import fs, { PathLike } from "fs";
 import sharp from "sharp";
 import ques from "readline-sync";
-import {SingleBar, Presets} from "cli-progress";
+import { SingleBar, Presets } from "cli-progress";
 
 
 type size = [number, number]
-type charCounter = { char: string, count: number }[]
+type charCounter = { count: number, char: string }[]
+// type charData = {[]}
+type charData = {
+    pixelOffset: number[];
+    chars: string[]
+}
 
 class ASCII_Generator {
 
@@ -23,7 +28,7 @@ class ASCII_Generator {
     onAdaptive = false;
     background = false;
     bar: SingleBar;
-    
+
     constructor(filePath: string, args?: string[]) {
         console.log(this.interval);
 
@@ -42,11 +47,11 @@ class ASCII_Generator {
             .then(s => {
                 newImg = this.resizeImage(sourceImg, s)
                 this.bar.increment(20)
-                newImg = this.convertGreyImage(newImg);
+                this.convertGreyImage(newImg);
                 this.toFile ? this.printToFile(newImg, s[0]) : this.printToConsole(newImg, s[0])
                 this.bar.increment(20)
             })
-        
+
         this.bar.update(100)
         this.bar.stop()
     }
@@ -61,7 +66,7 @@ class ASCII_Generator {
     }
 
     async getSize(img: sharp.Sharp): Promise<size> {
-        const ratio: number = (stdout.columns  / stdout.rows) / 2
+        const ratio: number = (stdout.columns / stdout.rows) / 2
         const size: size = [Math.floor(stdout.rows * ratio), Math.floor(stdout.rows * ratio)]
 
         if (this.onAdaptive) {
@@ -88,23 +93,27 @@ class ASCII_Generator {
     }
 
     //in work
-    ColorOut(img: string[], imageColorBuf: Buffer): string[] {
+    ColorOut(img: charData, imageColorBuf: Buffer): charData {
         this.bar.increment(10)
-        
-        const colorfulText: string[] = []
-        for ( let i = 0; i < img.length; i++){
-            if( img[i] === " "){
-                colorfulText.push(" ")
+
+        let [offset, char] = Object.values(img);
+        let tempChar = <string[]>char
+        let tempOffset = <number[]>offset
+
+        for (let i = 0; i < char.length; i++) {
+            if (tempChar[i] === " ") {
+                tempChar[i] = " "
             }
-            else{
-                let rgb = {r:imageColorBuf[i], g:imageColorBuf[i+1], b:imageColorBuf[i+2]}
-                let char = `\x1b[38;2;${rgb.r - 1};${rgb.g - 1};${rgb.b - 1}m${img[i]}`;
+
+            else {
+                let rgb = { r: imageColorBuf[tempOffset[i]], g: imageColorBuf[tempOffset[i+1]], b: imageColorBuf[tempOffset[i+2]] }
+                tempChar[i] = `\x1b[38;2;${rgb.r};${rgb.g};${rgb.b}m${tempChar[i]}`;
                 // let char = `\x1b[38;5;${imageColorBuf[i]}m${img[i]}`;
-                colorfulText.push(char)
+                // colorfulText.push(tempChar[i])
             }
 
         }
-        return colorfulText;
+        return {pixelOffset: tempOffset, chars: tempChar};
     }
 
     printToFile(img: sharp.Sharp, width: number): void {
@@ -127,52 +136,62 @@ class ASCII_Generator {
             })
     }
 
-    clearOftenSym(imgArr: string[], width: number) {
+    clearOftenSym(imgArr: charData, width: number): charData {
 
         let charCount: charCounter = []
         let tempImg: string = '';
+        let img = ''
 
-        let img = imgArr.join('')
-        
-        this.bar.increment(10)
-        img.split("").forEach((char) => {
+        let [offset, char] = Object.values(imgArr)
+        let tempOffSet = <number[]>offset
+
+        char.forEach((char: any) => {
 
             let charCheck = charCount.find((i) => i.char === char)
-            if (charCheck !== undefined) charCheck.count++; else charCount.push({ char, count: 1 })
+            if (charCheck !== undefined) charCheck.count++; else charCount.push({ count: 1, char })
 
         })
-        this.bar.increment(10)
+
         let maxSymbol = charCount.filter((i) => Math.max(i.count))[0].char
-        img = img.split("").map((c) => { if (c === maxSymbol) return " "; else return c }).join("");
-        
-        for ( let i = 0; i < img.length; i+=width ){
+        img = char.map((c, i) => {
+            if (c === maxSymbol) {
+                return " "
+            }
+            else { 
+                offset[i] = i
+                return c 
+            }
+        }).join("");
+
+        for (let i = 0; i < img.length; i += width) {
             let line = img.substring(i, i + width);
-            if (line.trim() !== ""){
+            if (line.trim() !== "") {
                 tempImg = tempImg + line;
             }
         }
-        img = tempImg
-        return img.split('')
+        img = tempImg;
+        return {pixelOffset: tempOffSet, chars: img.split('')}
     }
 
     async createArt(img: sharp.Sharp, width: number): Promise<string> {
         let imagePixels: Buffer = await img.raw().toBuffer();
-        let characters: string[] = [];
+        let charactersData: charData = { pixelOffset: [], chars: [] };
 
-        
-        imagePixels.forEach((pixel: any) => {
-            let char = this.ASCII_CHARS[Math.floor(pixel * this.interval)];
-            characters.push( char );
+
+        imagePixels.forEach((pixel: number) => {
+            let char: string = this.ASCII_CHARS[Math.floor(pixel * this.interval)];
+            charactersData.pixelOffset.push(pixel);
+            charactersData.chars.push(char);
         });
 
-        this.background ? characters = this.clearOftenSym(characters, width) : characters
-        this.withColor ? characters = this.ColorOut(characters, imagePixels) : characters
+        this.background ? charactersData = this.clearOftenSym(charactersData, width) : charactersData
+        this.withColor ? charactersData = this.ColorOut(charactersData, imagePixels) : charactersData
 
-   
+
         let ASCII = '';
-        for (let i = width ; i < characters.length; i += width) {
-            
-            let line = characters.slice(i, i + width).join('').replace('.','');
+        let chars = charactersData.chars
+        for (let i = width; i < charactersData.chars.length; i += width) {
+            let line = chars.slice(i, i + width).join('').replace('.', '');
 
             // let line = characters.split("").slice(i, i + width).toString();
             ASCII = ASCII + "\n" + line;
